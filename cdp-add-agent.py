@@ -3,7 +3,7 @@
 import suds.client
 import logging
 
-logger = logging.getLogger('r1soft-add-agent')
+logger = logging.getLogger('cdp-add-agent')
 logger.setLevel(logging.DEBUG)
 
 class MetaClient(object):
@@ -38,7 +38,6 @@ def get_wsdl_url(hostname, namespace, use_ssl=True, port_override=None):
     return url
 
 if __name__ == '__main__':
-    #hostname, use_db_addon=False username password cdp_host
     import sys
     import optparse
     import os
@@ -105,7 +104,7 @@ if __name__ == '__main__':
         fv.startingMinute = 0
         logger.debug('Creating policy for agent (%s) on disksafe (%s)', hostname, disksafe.id)
         policy = client.Policy.service.createPolicy(
-            enabled=False,
+            enabled=True,
             name=hostname,
             description=hostname,
             diskSafeID=disksafe.id,
