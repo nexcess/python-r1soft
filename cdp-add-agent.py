@@ -51,6 +51,9 @@ if __name__ == '__main__':
     parser.add_option('-p', '--password', dest='password',
         default=os.environ.get('CDP_PASS', ''),
         help='R1Soft server API password')
+    parser.add_option('-d', '--description', dest='description',
+        default=None,
+        help='Custom description field, default is the same as hostname, applied to all hosts')
     parser.add_option('-D', '--use-db-addon', dest='use_db_addon',
         action='store_true', default=False,
         help='Use the CDP DB addon')
@@ -65,7 +68,12 @@ if __name__ == '__main__':
     use_db_addon = options.use_db_addon
     recovery_point_limit = options.recovery_point_limit
     for hostname in args:
-        logger.info('Setting up backups for host (%s) on CDP server (%s)', hostname, cdp_host)
+        if options.description is None:
+            description = hostname
+        else:
+            description = '%s (%s)' % (options.description, hostname)
+        logger.info('Setting up backups for host (%s) on CDP server (%s) with description: %s',
+            hostname, cdp_host, description)
         client = MetaClient(get_wsdl_url(cdp_host, '%s'),
             username=username, password=password)
         logger.debug('Creating special types...')
@@ -83,7 +91,7 @@ if __name__ == '__main__':
         agent = client.Agent.service.createAgent(
             hostname=hostname,
             portNumber=1167,
-            description=hostname,
+            description=description,
             databaseAddOnEnabled=use_db_addon
         )
         logger.info('Created agent for host (%s) with ID: %s', hostname, agent.id)
@@ -106,7 +114,7 @@ if __name__ == '__main__':
         policy = client.Policy.service.createPolicy(
             enabled=True,
             name=hostname,
-            description=hostname,
+            description=description,
             diskSafeID=disksafe.id,
             frequencyType=FrequencyType.DAILY,
             frequencyValues=fv,
