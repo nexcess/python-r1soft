@@ -4,7 +4,9 @@ import suds.client
 import logging
 
 logger = logging.getLogger('cdp-add-agent')
+logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
+logger.propagate = False
 
 class MetaClient(object):
     def __init__(self, url_base, **kwargs):
