@@ -59,6 +59,10 @@ if __name__ == '__main__':
     parser.add_option('-D', '--use-db-addon', dest='use_db_addon',
         action='store_true', default=False,
         help='Use the CDP DB addon')
+    parser.add_option('--db-user', dest='sqluser',
+        help='MySQL user for DB addon')
+    parser.add_option('--db-pass', dest='sqlpass',
+        help='MySQL pass for DB addon')
     parser.add_option('-R', '--recovery-point-limit', dest='recovery_point_limit',
         type=int, default=30,
         help='Number of recovery points to keep')
@@ -69,6 +73,8 @@ if __name__ == '__main__':
     password = options.password
     use_db_addon = options.use_db_addon
     recovery_point_limit = options.recovery_point_limit
+    sqluser = options.sqluser
+    sqlpass = options.sqlpass
     for hostname in args:
         if options.description is None:
             description = hostname
@@ -82,8 +88,8 @@ if __name__ == '__main__':
         CompressionType = client.DiskSafe.factory.create('diskSafe.compressionType')
         CompressionLevel = client.DiskSafe.factory.create('diskSafe.compressionLevel')
         DeviceBackupType = client.DiskSafe.factory.create('diskSafe.deviceBackupType')
-        FrequencyType = client.Policy.factory.create('policy.frequencyType')
-        FrequencyValues = client.Policy.factory.create('policy.frequencyValues')
+        FrequencyType = client.Policy2.factory.create('frequencyType')
+        FrequencyValues = client.Policy2.factory.create('frequencyValues')
         logger.debug('Created special types')
         logger.debug('Getting volumes...')
         volumes = client.Volume.service.getVolumes()
@@ -109,19 +115,34 @@ if __name__ == '__main__':
             protectUnmountedDevices=False
         )
         logger.info('Created disksafe with ID: %s', disksafe.id)
-        fv = FrequencyValues
-        fv.hoursOfDay = [0]
-        fv.startingMinute = 0
-        logger.debug('Creating policy for agent (%s) on disksafe (%s)', hostname, disksafe.id)
-        policy = client.Policy.service.createPolicy(
-            enabled=True,
-            name=hostname,
-            description=description,
-            diskSafeID=disksafe.id,
-            frequencyType=FrequencyType.DAILY,
-            frequencyValues=fv,
-            recoveryPointLimit=recovery_point_limit,
-            forceFullBlockScan=False
-        )
+        FrequencyValues.hoursOfDay = [0]
+        FrequencyValues.startingMinute = 0
+        logger.debug('Creating policy for agent (%s) on disksafe (%s)',
+            hostname, disksafe.id)
+        policy = client.Policy2.factory.create('policy')
+        policy.enabled = True
+        policy.name = hostname
+        policy.description = description
+        policy.diskSafeID = disksafe.id
+        policy.mergeSchedulFrequencyType = FrequencyType.ON_DEMAND
+        policy.replicationScheduleFrequencyType = FrequencyType.DAILY
+        policy.replicationScheduleFrequencyValues = FrequencyValues
+        policy.recoveryPointLimit = recovery_point_limit
+        policy.forceFullBlockScan = False
+        if use_db_addon:
+            dbi = client.Policy2.factory.create('databaseInstance')
+            dbi.dataBaseType = client.Policy2.factory.create('dataBaseType').MYSQL
+            dbi.enabled = True
+            dbi.hostName = '127.0.0.1'
+            dbi.name = 'default'
+            dbi.username = sqluser
+            dbi.password = sqlpass
+            dbi.portNumber = 3306
+            dbi.useAlternateDataDirectory = False
+            dbi.useAlternateHostname = True
+            dbi.useAlternateInstallDirectory = False
+            policy.databaseInstanceList = [dbi]
+
+        policy = client.Policy2.service.createPolicy(policy=policy)
         logger.info('Created policy with ID: %s', policy.id)
         logger.info('Finished setting up backups for host: %s', hostname)
