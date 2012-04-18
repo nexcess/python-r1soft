@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger('cdp-add-agent')
 logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 logger.propagate = False
 
 class MetaClient(object):
@@ -45,14 +45,22 @@ if __name__ == '__main__':
     import sys
     import re
 
-    cdphost = sys.argv[1]
-    cdpuser, cdppass = sys.argv[2].split(':')
-    sqluser, sqlpass = sys.argv[3].split(':')
+    try:
+        cdphost = sys.argv[1]
+        cdpuser, cdppass = sys.argv[2].split(':')
+        sqluser, sqlpass = sys.argv[3].split(':')
+    except IndexError:
+        logger.error('Usage: %s <r1soft host> <CDP user>:<CDP pass> <MySQL user>:<MySQL pass>')
+        sys.exit(1)
+
+    logger.info('Using CDP host: %s', cdphost)
+    logger.info('Using CDP credentials: %s / %s', cdpuser, cdppass)
+    logger.info('Using SQL credentials: %s / %s', sqluser, sqlpass)
 
     client = MetaClient(get_wsdl_url(cdphost, '%s'),
         username=cdpuser, password=cdppass)
 
-    db_cand_pattern = re.compile('mce\d+-db|(?:obp|sip)(?:uk)?4-\d+')
+    db_cand_pattern = re.compile('mce\d+-db|(?:obp|sip)(?:uk)?[456]-\d+')
 
     logger.info('Getting list of agents')
     agents = client.Agent.service.getAgents()
@@ -72,40 +80,39 @@ if __name__ == '__main__':
             else:
                 logger.info('==> Enabling db plugin for agent')
                 agent.databaseAddOnEnabled = True
-                #client.Agent.service.updateAgent(agent)
+                try:
+                    client.Agent.service.updateAgent(agent)
+                except suds.WebFault as e:
+                    logger.error('Caught error from web service: %s', e.message)
                 logger.debug('*** Enabled db plugin ***')
-            logger.info('=> Finding disksafes for agent')
+            logger.debug('=> Finding disksafes for agent')
             agent_ds = [d for d in disksafes if d.agentID == agent.id]
             logger.debug('=> Found %d disksafe(s)', len(agent_ds))
-            logger.info('=> Finding policy for agent')
+            logger.debug('=> Finding policy for agent')
             policy = [p for p in policies if p.diskSafeID in [d.id for d in agent_ds]][0]
             logger.debug('=> Found policy %s (%s)', policy.name, policy.id)
             try:
                 dbi_count = len(policy.databaseInstanceList)
             except AttributeError as e:
-                logger.warn('!! Does not look like agent has db plugin enabled: %s !!', e)
+                #logger.warn('!! Does not look like agent has db plugin enabled: %s !!', e)
+                dbi_count = 0
+            if dbi_count > 0:
+                logger.info('==> Policy already has %d database instances',
+                    len(policy.databaseInstanceList))
             else:
-                if dbi_count > 0:
-                    logger.info('==> Policy already has %d database instances',
-                        len(policy.databaseInstanceList))
-                else:
-                    logger.info('==> Policy has no database instances, creating one')
-                    dbi = client.Policy2.factory.create('databaseInstance')
-                    dbi.advancedOptions.entry.append({
-                            'DO_TABLE_STATS_OPTION': False
-                        })
-                    dbi.dataBaseType = client.Policy2.factory.create('dataBaseType').MYSQL
-                    dbi.enabled = True
-                    dbi.hostname = '127.0.0.1'
-                    dbi.name = 'default'
-                    dbi.username = sqluser
-                    dbi.password = sqlpass
-                    dbi.portNumber = 3306
-                    dbi.useAlternateDataDirectory = False
-                    dbi.useAlternateHostname = True
-                    dbi.useAlternateInstallDirectory = False
-                    logger.info('==> Adding database instance to policy')
-                    #policy.databaseInstanceList.append(dbi)
-                    logger.debug('*** Added database instance to policy ***')
-            if policy.state != 'OK':
-                logger.warn('!! Policy (%s/%s) is not OK !!', policy.name, policy.description)
+                logger.info('==> Policy has no database instances, creating one')
+                dbi = client.Policy2.factory.create('databaseInstance')
+                dbi.dataBaseType = client.Policy2.factory.create('dataBaseType').MYSQL
+                dbi.enabled = True
+                dbi.hostName = '127.0.0.1'
+                dbi.name = 'default'
+                dbi.username = sqluser
+                dbi.password = sqlpass
+                dbi.portNumber = 3306
+                dbi.useAlternateDataDirectory = False
+                dbi.useAlternateHostname = True
+                dbi.useAlternateInstallDirectory = False
+                policy.databaseInstanceList = [dbi]
+                logger.debug('==> Adding database instance to policy')
+                client.Policy2.service.updatePolicy(policy=policy)
+                logger.debug('*** Added database instance to policy ***')
