@@ -60,7 +60,7 @@ if __name__ == '__main__':
     client = MetaClient(get_wsdl_url(cdphost, '%s'),
         username=cdpuser, password=cdppass)
 
-    db_cand_pattern = re.compile('mce\d+-db|(?:obp|sip)(?:uk)?[456]-\d+')
+    db_cand_pattern = re.compile('(?:mce\d+|[\w\d]{2,3})-db|(?:obp|sip)(?:uk)?[456]-\d+|sip4[a-z]-db')
 
     logger.info('Getting list of agents')
     agents = client.Agent.service.getAgents()
@@ -89,7 +89,11 @@ if __name__ == '__main__':
             agent_ds = [d for d in disksafes if d.agentID == agent.id]
             logger.debug('=> Found %d disksafe(s)', len(agent_ds))
             logger.debug('=> Finding policy for agent')
-            policy = [p for p in policies if p.diskSafeID in [d.id for d in agent_ds]][0]
+            try:
+                policy = [p for p in policies if hasattr(p, 'diskSafeID') and p.diskSafeID in [d.id for d in agent_ds]][0]
+            except IndexError as e:
+                logger.error('=> Couldn\'t determine policy for disk safe')
+                continue
             logger.debug('=> Found policy %s (%s)', policy.name, policy.id)
             try:
                 dbi_count = len(policy.databaseInstanceList)
