@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-# Nexcess.net Turpentine Extension for Magento
-# Copyright (C) 2012  Nexcess.net L.L.C.
+# Nexcess.net python-r1soft
+# Copyright (C) 2013  Nexcess.net L.L.C.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
