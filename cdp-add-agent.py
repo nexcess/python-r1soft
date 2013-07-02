@@ -124,7 +124,7 @@ if __name__ == '__main__':
         policy.name = hostname
         policy.description = description
         policy.diskSafeID = disksafe.id
-        policy.mergeSchedulFrequencyType = FrequencyType.ON_DEMAND
+        policy.mergeScheduleFrequencyType = FrequencyType.ON_DEMAND
         policy.replicationScheduleFrequencyType = FrequencyType.DAILY
         policy.replicationScheduleFrequencyValues = FrequencyValues
         policy.recoveryPointLimit = recovery_point_limit
