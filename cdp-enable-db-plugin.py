@@ -60,7 +60,7 @@ if __name__ == '__main__':
     client = MetaClient(get_wsdl_url(cdphost, '%s'),
         username=cdpuser, password=cdppass)
 
-    db_cand_pattern = re.compile('(?:mce\d+|[\w\d]{2,3})-db|(?:obp|sip)(?:uk)?[456]-\d+|sip4[a-z]-db')
+    db_cand_pattern = re.compile('(?:mce\d+|[\w\d]{2,3})-db|(?:obp|sip|eep)(?:uk|au)?[1-6]-\d+|sip4[a-z]-db')
 
     logger.info('Getting list of agents')
     agents = client.Agent.service.getAgents()
