@@ -19,30 +19,37 @@
 
 import suds
 
-def build_wsdl_url(host, namespace, port=None, ssl=True):
+def build_wsdl_url(host, namespace, username, password, port=None, ssl=True):
     """Build WSDL URL for CDP3+ API
     """
 
     proto = 'https' if ssl else 'http'
     if port is None:
-        port = 9443 if ssl else 9080
+        port = CDP3Client.PORT_HTTPS if ssl else CDP3Client.PORT_HTTP
 
-    url = '{proto}://{host}:{port}/{namespace}?wsdl'.format(
+    url = '{proto}://{username}:{password}@{host}:{port}/{namespace}?wsdl'.format(
         proto=proto,
+        username=username,
+        password=password,
         host=host,
         port=port,
         namespace=namespace
     )
-
+    return url
 
 class CDP3Client(object):
     """SOAP client for CDP3+ API
     """
 
+    PORT_HTTP   = 9080
+    PORT_HTTPS  = 9443
+
     __namespaces = {}
 
-    def __init__(self, host, port=None, ssl=True, **kwargs):
+    def __init__(self, host, username, password, port=None, ssl=True, **kwargs):
         self._host = host
+        self._username = username
+        self._password = password
         self._port = port
         self._ssl = ssl
         self._init_args = kwargs
@@ -51,7 +58,7 @@ class CDP3Client(object):
         ns = self.__namespaces.get(name, None)
         if ns is None:
             ns = suds.client.Client(
-                build_wsdl_url(self._host, ns, self._port, self._ssl),
+                build_wsdl_url(self._host, ns, username, password, self._port, self._ssl),
                 **self._init_args)
             self.__namespaces[name] = ns
         return ns
