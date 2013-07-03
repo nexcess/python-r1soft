@@ -17,7 +17,10 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import logging
 import xmlrpclib
+
+logger = logging.getLogger('r1soft.cdp2')
 
 def build_xmlrpc_url(host, username, password, port=None, ssl=True):
     """
@@ -34,9 +37,10 @@ def build_xmlrpc_url(host, username, password, port=None, ssl=True):
         host=host,
         port=port
     )
+    logger.debug('Built XMLRPC URL: %s', url)
     return url
 
-class CDP2Client(object):
+class CDP2Client(xmlrpclib.ServerProxy):
     """
     """
 
@@ -44,8 +48,5 @@ class CDP2Client(object):
     PORT_HTTPS  = 8085
 
     def __init__(self, host, username, password, port=None, ssl=True):
-        self._client = xmlrpclib.ServerProxy(build_xmlrpc_url(
+        super(CDP2Client, self).__init__(build_xmlrpc_url(
             host, username, password, port, ssl))
-
-    def __getattr__(self, name):
-        return getattr(self._client, name)

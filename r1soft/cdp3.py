@@ -17,7 +17,10 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import logging
 import suds
+
+logger = logging.getLogger('r1soft.cdp3')
 
 def build_wsdl_url(host, namespace, port=None, ssl=True):
     """Build WSDL URL for CDP3+ API
@@ -33,6 +36,7 @@ def build_wsdl_url(host, namespace, port=None, ssl=True):
         port=port,
         namespace=namespace
     )
+    logger.debug('Built WSDL url: %s', url)
     return url
 
 class CDP3Client(object):
@@ -53,8 +57,10 @@ class CDP3Client(object):
         self._init_args = kwargs
 
     def __getattr__(self, name):
+        logger.debug('Loading SOAP client for namespace: %s', name)
         ns = self.__namespaces.get(name, None)
         if ns is None:
+            logger.debug('Client doesn\'t exist, creating client for namespace: %s', name)
             ns = suds.client.Client(
                 build_wsdl_url(self._host, name, self._port, self._ssl),
                 username=self._username,
