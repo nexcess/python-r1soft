@@ -19,7 +19,7 @@
 
 import suds
 
-def build_wsdl_url(host, namespace, username, password, port=None, ssl=True):
+def build_wsdl_url(host, namespace, port=None, ssl=True):
     """Build WSDL URL for CDP3+ API
     """
 
@@ -27,14 +27,13 @@ def build_wsdl_url(host, namespace, username, password, port=None, ssl=True):
     if port is None:
         port = CDP3Client.PORT_HTTPS if ssl else CDP3Client.PORT_HTTP
 
-    url = '{proto}://{username}:{password}@{host}:{port}/{namespace}?wsdl'.format(
+    url = '{proto}://{host}:{port}/{namespace}?wsdl'.format(
         proto=proto,
-        username=username,
-        password=password,
         host=host,
         port=port,
         namespace=namespace
     )
+    print url
     return url
 
 class CDP3Client(object):
@@ -58,7 +57,9 @@ class CDP3Client(object):
         ns = self.__namespaces.get(name, None)
         if ns is None:
             ns = suds.client.Client(
-                build_wsdl_url(self._host, ns, username, password, self._port, self._ssl),
+                build_wsdl_url(self._host, name, self._port, self._ssl),
+                username=self._username,
+                password=self._password,
                 **self._init_args)
             self.__namespaces[name] = ns
         return ns
