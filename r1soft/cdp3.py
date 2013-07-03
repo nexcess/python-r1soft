@@ -33,7 +33,6 @@ def build_wsdl_url(host, namespace, port=None, ssl=True):
         port=port,
         namespace=namespace
     )
-    print url
     return url
 
 class CDP3Client(object):
