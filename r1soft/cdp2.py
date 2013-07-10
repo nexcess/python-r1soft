@@ -22,6 +22,9 @@ import xmlrpclib
 
 logger = logging.getLogger('r1soft.cdp2')
 
+# example: Thu Jun 27 2013 02:03:33 EDT
+TIMESTAMP_FMT = '%a %b %d %Y %H:%M:%S %Z'
+
 def build_xmlrpc_url(host, username, password, port=None, ssl=True):
     """
     """
@@ -48,5 +51,6 @@ class CDP2Client(xmlrpclib.ServerProxy):
     PORT_HTTPS  = 8085
 
     def __init__(self, host, username, password, port=None, ssl=True):
-        super(CDP2Client, self).__init__(build_xmlrpc_url(
+        # looks like ServerProxy is an oldstyle class, can't use super()
+        xmlrpclib.ServerProxy.__init__(self, build_xmlrpc_url(
             host, username, password, port, ssl))

@@ -46,9 +46,8 @@ class CDP3Client(object):
     PORT_HTTP   = 9080
     PORT_HTTPS  = 9443
 
-    __namespaces = {}
-
     def __init__(self, host, username, password, port=None, ssl=True, **kwargs):
+        self.__namespaces = {}
         self._host = host
         self._username = username
         self._password = password
