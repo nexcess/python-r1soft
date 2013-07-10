@@ -73,6 +73,37 @@ def handle_cdp3_server(server):
     for policy in client.Policy2.service.getPolicies():
         if not policy.enabled:
             continue
+        disksafe = client.DiskSafe.service.getDiskSafeByID(policy.diskSafeID)
+        agent = client.Agent.service.getAgentByID(disksafe.agentID)
+        task_list = [task for task in (client.TaskHistory.service.getTaskExecutionContextByID(tid) \
+                for tid in client.TaskHistory.service.getTaskExecutionContextIDsByAgent(disksafe.agentID)) \
+            if task.taskType == 'DATA_PROTECTION_POLICY']
+        task_list.sort(key=lambda t: t.executionTime)
+        if task_list:
+            latest_task = task_list[-1]
+            if last_successful is None:
+                last_successful = latest_task.executionTime.replace(microsecond=0)
+            elif last_successful < latest_task.executionTime:
+                last_successful = latest_task.executionTime.replace(microsecond=0)
+        if policy.state not in ('ERROR', 'UNKNOWN'):
+            continue
+        try:
+            success = [t.executionTime for t in task_list if t.taskState == 'FINISHED'][-1].replace(microsecond=0)
+        except IndexError:
+            success = None
+        host_result = (agent.hostname, success)
+        host_results.append(host_result)
+    return (last_successful, host_results)
+
+def handle_cdp5_server(server):
+    last_successful = None
+    host_results = []
+    client = r1soft.cdp3.CDP3Client(server['hostname'], server['username'],
+        server['password'], server['port'], server['ssl'])
+
+    for policy in client.Policy2.service.getPolicies():
+        if not policy.enabled:
+            continue
         try:
             if last_successful is None:
                 last_successful = policy.lastReplicationRunTime.replace(microsecond=0)
@@ -101,7 +132,7 @@ def handle_server(server):
         2:  handle_cdp2_server,
         3:  handle_cdp3_server,
         4:  handle_cdp3_server,
-        5:  handle_cdp3_server,
+        5:  handle_cdp5_server,
     }.get(server['version'])
     return handle_func(server)
 
