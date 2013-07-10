@@ -77,7 +77,7 @@ def handle_cdp3_server(server):
         agent = client.Agent.service.getAgentByID(disksafe.agentID)
         task_list = [task for task in (client.TaskHistory.service.getTaskExecutionContextByID(tid) \
                 for tid in client.TaskHistory.service.getTaskExecutionContextIDsByAgent(disksafe.agentID)) \
-            if task.taskType == 'DATA_PROTECTION_POLICY']
+            if task.taskType == 'DATA_PROTECTION_POLICY' and 'executionTime' in task]
         task_list.sort(key=lambda t: t.executionTime)
         if task_list:
             latest_task = task_list[-1]
@@ -117,7 +117,7 @@ def handle_cdp5_server(server):
         agent = client.Agent.service.getAgentByID(disksafe.agentID)
         task_list = [task for task in (client.TaskHistory.service.getTaskExecutionContextByID(tid) \
                 for tid in client.TaskHistory.service.getTaskExecutionContextIDsByAgent(disksafe.agentID)) \
-            if task.taskType == 'DATA_PROTECTION_POLICY']
+            if task.taskType == 'DATA_PROTECTION_POLICY' and 'executionTime' in task]
         task_list.sort(key=lambda t: t.executionTime)
         try:
             success = [t.executionTime for t in task_list if t.taskState == 'FINISHED'][-1].replace(microsecond=0)
