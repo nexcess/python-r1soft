@@ -60,7 +60,8 @@ class CDP3Client(object):
         logger.debug('Loading SOAP client for namespace: %s', name)
         ns = self.__namespaces.get(name, None)
         if ns is None:
-            logger.debug('Client doesn\'t exist, creating client for namespace: %s', name)
+            logger.debug('Client doesn\'t exist, creating client for ' \
+                'namespace: %s', name)
             ns = suds.client.Client(
                 build_wsdl_url(self._host, name, self._port, self._ssl),
                 username=self._username,
