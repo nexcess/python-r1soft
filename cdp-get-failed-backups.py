@@ -75,9 +75,9 @@ def handle_cdp3_server(server):
             continue
         try:
             if last_successful is None:
-                last_successful = policy.lastReplicationRunTime
+                last_successful = policy.lastReplicationRunTime.replace(microsecond=0)
             elif last_successful < policy.lastReplicationRunTime:
-                last_successful = policy.lastReplicationRunTime
+                last_successful = policy.lastReplicationRunTime.replace(microsecond=0)
         except AttributeError:
             continue
         if policy.state not in ('ERROR', 'UNKNOWN'):
@@ -94,7 +94,6 @@ def handle_cdp3_server(server):
             success = None
         host_result = (agent.hostname, success)
         host_results.append(host_result)
-    last_successful = last_successful.replace(microsecond=0)
     return (last_successful, host_results)
 
 def handle_server(server):
