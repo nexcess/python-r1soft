@@ -19,6 +19,10 @@
 
 import optparse
 import os
+try:
+    import multiprocessing
+except ImportError:
+    multiprocessing = None
 
 def build_option_parser(parser=None):
     if parser is None:
@@ -32,3 +36,37 @@ def build_option_parser(parser=None):
         help='R1Soft API password',
         default=os.environ.get('R1SOFT_PASSWORD', ''))
     return parser
+
+def read_config(config_filename):
+    with open(config_filename) as f:
+        config_raw = f.read().strip()
+    keys = ['version', 'hostname', 'port', 'ssl', 'username', 'password']
+    config = [dict(zip(keys, (field.strip() for field in line.strip().split(':')))) \
+            for line in config_raw.split('\n') \
+        if line.strip() and not line.startswith('#')]
+    int_keys = ['version', 'port', 'ssl']
+    for server in config:
+        for key in int_keys:
+            server[key] = int(server[key])
+    return config
+
+def build_link(server):
+    return '{proto}://{hostname}:{port}/'.format(
+        hostname=server['hostname'],
+        port=server['port'],
+        proto='https' if server['ssl'] else 'http'
+    )
+
+def dispatch_handlers(config, handle_map, default=None):
+    if default is None:
+        def default(server):
+            raise Exception('CDP version %d is unsupported' % server['version'])
+
+    for server in config:
+        yield (server, lambda: handle_map.get(server['version'], default)(server))
+
+def dispatch_handlers_mp(config, handle_map, default=None, workers=4):
+    if multiprocessing is None:
+        return dispatch_handlers(config, handle_map, default)
+    else:
+        pass

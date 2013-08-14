@@ -25,6 +25,12 @@ logger = logging.getLogger('r1soft.cdp2')
 # example: Thu Jun 27 2013 02:03:33 EDT
 TIMESTAMP_FMT = '%a %b %d %Y %H:%M:%S %Z'
 
+HOST_TYPES = {
+    -1: 'UNKNOWN',
+    0: 'LINUX',
+    1: 'WINDOWS',
+}
+
 def build_xmlrpc_url(host, username, password, port=None, ssl=True):
     """
     """
