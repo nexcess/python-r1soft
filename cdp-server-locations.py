@@ -74,6 +74,7 @@ handler_map = {
 
 if __name__ == '__main__':
     import sys
+    import itertools
 
     HOST_LIST_HEADER = '^ Hostname (Description) ^ Backup Server ^ Host Type ^ Enabled ^ MySQL Module ^'
     HOST_LIST_LINE = '| {hostname} ({description}) | [[{server_link}|{server_hostname}]] | {type} | {active} | {mysql_module} |'
@@ -88,6 +89,8 @@ if __name__ == '__main__':
         sys.exit(1)
 
     server_results = {}
+    agent_lines = []
+
     print HOST_LIST_HEADER
     for server, get_results in r1soft.util.dispatch_handlers(config, handler_map):
         try:
@@ -97,12 +100,12 @@ if __name__ == '__main__':
             continue
         server_results[server['hostname']] = True
         for agent in results:
-            print HOST_LIST_LINE.format(
+            agent_lines.append(HOST_LIST_LINE.format(
                 server_hostname=server['hostname'],
                 server_link=r1soft.util.build_link(server),
                 **agent
-            )
-
+            ))
+    print '\n'.join(sorted(agent_lines))
     print ''
     print SERVER_LIST_HEADER
     for server in server_results:
