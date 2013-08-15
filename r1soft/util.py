@@ -24,6 +24,9 @@ try:
 except ImportError:
     multiprocessing = None
 
+from .cdp2 import CDP2Client
+from .cdp3 import CDP3Client
+
 def build_option_parser(parser=None):
     if parser is None:
         parser = optparse.OptionParser()
@@ -70,3 +73,11 @@ def dispatch_handlers_mp(config, handle_map, default=None, workers=4):
         return dispatch_handlers(config, handle_map, default)
     else:
         pass
+
+def build_cdp2_client(server):
+    return CDP2Client(server['hostname'], server['username'],
+        server['password'], server['port'], server['ssl'])
+
+def build_cdp3_client(server):
+    return CDP3Client(server['hostname'], server['username'],
+        server['password'], server['port'], server['ssl'])

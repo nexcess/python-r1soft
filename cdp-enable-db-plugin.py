@@ -1,122 +1,130 @@
-#!/usr/bin/env
-
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
-import suds.client
+# Nexcess.net python-r1soft
+# Copyright (C) 2013  Nexcess.net L.L.C.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
 import logging
+import re
+
+import r1soft
 
 logger = logging.getLogger('cdp-add-agent')
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 logger.propagate = False
 
-class MetaClient(object):
-    def __init__(self, url_base, **kwargs):
-        self.__url_base = url_base
-        self.__init_args = kwargs
-        self.__clients = dict()
+DB_PLUGIN_CANDIDATES_RE = re.compile(
+    r'(?:mce\d+|[\w\d]{2,3})-db|(?:obp|sip|eep)(?:uk|au)?[1-6]-\d+|sip4[a-z]-db')
 
-    def __getattr__(self, name):
-        c = self.__clients.get(name, None)
-        logger.debug('Accessing SOAP client: %s' % name)
-        if c is None:
-            logger.debug('Client doesn\'t exist, creating: %s' % name)
-            c = suds.client.Client(self.__url_base % name, **self.__init_args)
-            self.__clients[name] = c
-        return c
+def handle_cdp3_server(server, db_username, db_password):
+    logger.info('Checking DB plugin for agents on server %s', server['hostname'])
+    client = r1soft.util.build_cdp3_client(server)
 
-def get_wsdl_url(hostname, namespace, use_ssl=True, port_override=None):
-    if use_ssl:
-        proto = 'https'
-    else:
-        proto = 'http'
-    if port_override is None:
-        if use_ssl:
-            port = 9443
-        else:
-            port = 9080
-    else:
-        port = port_override
-    url = '%s://%s:%d/%s?wsdl' % (proto, hostname, port, namespace)
-    logging.debug('Creating WSDL URL: %s' % url)
-    return url
+    policies = client.Policy2.service.getPolicies()
+    disk_safes = client.DiskSafe.service.getDiskSafes()
+    for agent in client.Agent.service.getAgents():
+        if DB_PLUGIN_CANDIDATES_RE.match(agent.hostname) or \
+                DB_PLUGIN_CANDIDATES_RE.match(agent.description):
+            if not agent.databaseAddOnEnabled:
+                logger.info('Enabling DB plugin for agent: %s', agent.hostname)
+                agent.databaseAddOnEnabled = True
+                client.Agent.service.updateAgent(agent)
+            agent_disk_safes = [ds for ds in disk_safes if ds.agentID == agent.id]
+            agent_policies = [p for p in policies \
+                if p.enabled and hasattr(p, 'diskSafeID') and \
+                    p.diskSafeID in [ds.id for ds in agent_disk_safes]]
+            for policy in agent_policies:
+                if not (hasattr(policy, 'databaseInstanceList') and \
+                        len(policy.databaseInstanceList) > 0):
+                    logger.info('Adding DB to agent (%s) policy %s (%s)',
+                        agent.hostname, policy.name, policy.id)
+                    db_instance = client.Policy2.factory.create('databaseInstance')
+                    db_instance.dataBaseType = client.Policy2.factory.create('dataBaseType').MYSQL
+                    db_instance.enabled = True
+                    db_instance.hostName = '127.0.0.1'
+                    db_instance.name = 'default'
+                    db_instance.username = db_username
+                    db_instance.password = db_password
+                    db_instance.portNumber = 3306
+                    db_instance.useAlternateDataDirectory = False
+                    db_instance.useAlternateHostname = True
+                    db_instance.useAlternateInstallDirectory = False
+                    policy.databaseInstanceList = [db_instance]
+                    client.Policy2.service.updatePolicy(policy=policy)
+
+def handle_cdp5_server(server, db_username, db_password):
+    logger.info('Checking DB plugin for agents on server %s', server['hostname'])
+    client = r1soft.util.build_cdp3_client(server)
+
+    policies = client.Policy2.service.getPolicies()
+    disk_safes = client.DiskSafe.service.getDiskSafes()
+    for agent in client.Agent.service.getAgents():
+        if DB_PLUGIN_CANDIDATES_RE.match(agent.hostname) or \
+                DB_PLUGIN_CANDIDATES_RE.match(agent.description):
+            if not agent.databaseAddOnEnabled:
+                logger.info('Enabling DB plugin for agent: %s', agent.hostname)
+                agent.databaseAddOnEnabled = True
+                client.Agent.service.updateAgent(agent)
+            agent_disk_safes = [ds for ds in disk_safes if ds.agentID == agent.id]
+            agent_policies = [p for p in policies \
+                if p.enabled and hasattr(p, 'diskSafeID') and \
+                    p.diskSafeID in [ds.id for ds in agent_disk_safes]]
+            for policy in agent_policies:
+                if not (hasattr(policy, 'databaseInstanceList') and \
+                        len(policy.databaseInstanceList) > 0):
+                    logger.info('Adding DB to agent (%s) policy %s (%s)',
+                        agent.hostname, policy.name, policy.id)
+                    db_instance = client.Policy2.factory.create('databaseInstance')
+                    db_instance.dataBaseType = client.Policy2.factory.create('dataBaseType').MYSQL
+                    db_instance.enabled = True
+                    db_instance.hostName = '127.0.0.1'
+                    db_instance.name = 'default'
+                    db_instance.username = db_username
+                    db_instance.password = db_password
+                    db_instance.portNumber = 3306
+                    db_instance.useAlternateDataDirectory = False
+                    db_instance.useAlternateHostname = True
+                    db_instance.useAlternateInstallDirectory = False
+                    policy.databaseInstanceList = [db_instance]
+                    del policy.exchangeSettings
+                    client.Policy2.service.updatePolicy(policy=policy)
 
 if __name__ == '__main__':
     import sys
-    import re
 
     try:
-        cdphost = sys.argv[1]
-        cdpuser, cdppass = sys.argv[2].split(':')
-        sqluser, sqlpass = sys.argv[3].split(':')
+        db_user, db_pass = sys.argv[1].split(':')
+        config_file = sys.argv[2]
     except IndexError:
-        logger.error('Usage: %s <r1soft host> <CDP user>:<CDP pass> <MySQL user>:<MySQL pass>')
+        logger.error('Usage: %s <MySQL user>:<MySQL pass> <config file>' % sys.argv[0])
         sys.exit(1)
 
-    logger.info('Using CDP host: %s', cdphost)
-    logger.info('Using CDP credentials: %s / %s', cdpuser, cdppass)
-    logger.info('Using SQL credentials: %s / %s', sqluser, sqlpass)
+    config = r1soft.util.read_config(config_file)
 
-    client = MetaClient(get_wsdl_url(cdphost, '%s'),
-        username=cdpuser, password=cdppass)
+    handler_map = {
+        3: lambda server: handle_cdp3_server(server, db_user, db_pass),
+        5: lambda server: handle_cdp5_server(server, db_user, db_pass),
+    }
 
-    db_cand_pattern = re.compile('(?:mce\d+|[\w\d]{2,3})-db|(?:obp|sip|eep)(?:uk|au)?[1-6]-\d+|sip4[a-z]-db')
-
-    logger.info('Getting list of agents')
-    agents = client.Agent.service.getAgents()
-    logger.info('Getting list of disk safes')
-    disksafes = client.DiskSafe.service.getDiskSafes()
-    logger.info('Getting list of policies')
-    policies = client.Policy2.service.getPolicies()
-
-    for agent in agents:
-        logger.info('> Considering agent %s (%s)', agent.hostname, agent.description)
-        if db_cand_pattern.match(agent.hostname) or \
-                db_cand_pattern.match(agent.description):
-            logger.info('=> Agent looks like a good candidate for db plugin: %s',
-                agent.hostname)
-            if agent.databaseAddOnEnabled:
-                logger.info('==> Agent already has db plugin enabled')
-            else:
-                logger.info('==> Enabling db plugin for agent')
-                agent.databaseAddOnEnabled = True
-                try:
-                    client.Agent.service.updateAgent(agent)
-                except suds.WebFault as e:
-                    logger.error('Caught error from web service: %s', e.message)
-                logger.debug('*** Enabled db plugin ***')
-            logger.debug('=> Finding disksafes for agent')
-            agent_ds = [d for d in disksafes if d.agentID == agent.id]
-            logger.debug('=> Found %d disksafe(s)', len(agent_ds))
-            logger.debug('=> Finding policy for agent')
-            try:
-                policy = [p for p in policies if hasattr(p, 'diskSafeID') and p.diskSafeID in [d.id for d in agent_ds]][0]
-            except IndexError as e:
-                logger.error('=> Couldn\'t determine policy for disk safe')
-                continue
-            logger.debug('=> Found policy %s (%s)', policy.name, policy.id)
-            try:
-                dbi_count = len(policy.databaseInstanceList)
-            except AttributeError as e:
-                #logger.warn('!! Does not look like agent has db plugin enabled: %s !!', e)
-                dbi_count = 0
-            if dbi_count > 0:
-                logger.info('==> Policy already has %d database instances',
-                    len(policy.databaseInstanceList))
-            else:
-                logger.info('==> Policy has no database instances, creating one')
-                dbi = client.Policy2.factory.create('databaseInstance')
-                dbi.dataBaseType = client.Policy2.factory.create('dataBaseType').MYSQL
-                dbi.enabled = True
-                dbi.hostName = '127.0.0.1'
-                dbi.name = 'default'
-                dbi.username = sqluser
-                dbi.password = sqlpass
-                dbi.portNumber = 3306
-                dbi.useAlternateDataDirectory = False
-                dbi.useAlternateHostname = True
-                dbi.useAlternateInstallDirectory = False
-                policy.databaseInstanceList = [dbi]
-                logger.debug('==> Adding database instance to policy')
-                client.Policy2.service.updatePolicy(policy=policy)
-                logger.debug('*** Added database instance to policy ***')
+    dummy_func = lambda server: (server, lambda: None)
+    for (server, handler) in r1soft.util.dispatch_handlers(config, handler_map,
+            dummy_func):
+        try:
+            handler()
+        except Exception as err:
+            logger.exception(err)
