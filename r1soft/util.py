@@ -56,7 +56,7 @@ def read_config(config_filename):
 def build_link(server):
     return '{proto}://{hostname}:{port}/'.format(
         hostname=server['hostname'],
-        port=server['port'],
+        port=8001 if server['ssl'] else 8000,
         proto='https' if server['ssl'] else 'http'
     )
 
