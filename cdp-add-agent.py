@@ -85,6 +85,7 @@ if __name__ == '__main__':
         client = MetaClient(get_wsdl_url(cdp_host, '%s'),
             username=username, password=password)
         logger.debug('Creating special types...')
+        DiskSafeObject = client.DiskSafe.factory.create('diskSafe.disksafe')
         CompressionType = client.DiskSafe.factory.create('diskSafe.compressionType')
         CompressionLevel = client.DiskSafe.factory.create('diskSafe.compressionLevel')
         DeviceBackupType = client.DiskSafe.factory.create('diskSafe.deviceBackupType')
@@ -104,16 +105,15 @@ if __name__ == '__main__':
         )
         logger.info('Created agent for host (%s) with ID: %s', hostname, agent.id)
         logger.debug('Creating disksafe for agent (%s) on volume (%s)', agent.id, volume.id)
-        disksafe = client.DiskSafe.service.createDiskSafeOnVolume(
-            name=hostname,
-            agentID=agent.id,
-            volumeID=volume.id,
-            compressionType=CompressionType.QUICKLZ,
-            compressionLevel=CompressionLevel.LOW,
-            deviceBackupType=DeviceBackupType.AUTO_ADD_DEVICES,
-            protectStorageConfiguration=True,
-            protectUnmountedDevices=False
-        )
+        DiskSafeObject.description = hostname
+        DiskSafeObject.agentID = agent.id
+        DiskSafeObject.volumeID = volume.id
+        DiskSafeObject.compressionType = CompressionType.QUICKLZ
+        DiskSafeObject.compressionLevel = CompressionLevel.LOW
+        DiskSafeObject.deviceBackupType = DeviceBackupType.AUTO_ADD_DEVICES
+        DiskSafeObject.backupPartitionTable = True
+        DiskSafeObject.backupUnmountedDevices = False
+        disksafe = client.DiskSafe.service.createDiskSafeWithObject(DiskSafeObject)
         logger.info('Created disksafe with ID: %s', disksafe.id)
         FrequencyValues.hoursOfDay = [0]
         FrequencyValues.startingMinute = 0
