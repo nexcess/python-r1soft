@@ -68,3 +68,16 @@ class CDP3Client(object):
                 **self._init_args)
             self.__namespaces[name] = ns
         return ns
+
+    def build_object(self, namespace, object_type, attributes):
+        object_instance = getattr(self, namespace).factory.create(object_type)
+
+        for key, value in attributes.iteritems():
+            if type(value) == tuple:
+                attr_type = getattr(self, namespace).factory.create(value[0])
+                attr_value = getattr(attr_type, value[1])
+                setattr(object_instance, key, attr_value)
+            else:
+                setattr(object_instance, key, value)
+
+        return object_instance
