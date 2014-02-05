@@ -25,6 +25,10 @@ import r1soft
 
 logger = logging.getLogger('cdp-get-failed-backups')
 
+DAY_IN_SECONDS      = 60 * 60 * 24
+CDP3_STUCK_DELTA    = DAY_IN_SECONDS
+CDP5_STUCK_DELTA    = DAY_IN_SECONDS
+
 def read_config(config_filename):
     with open(config_filename) as f:
         config_raw = f.read().strip()
@@ -88,7 +92,8 @@ def handle_cdp3_server(server):
         if policy.state not in ('ERROR', 'UNKNOWN'):
             continue
         try:
-            success = [t.executionTime for t in task_list if t.taskState == 'FINISHED'][-1].replace(microsecond=0)
+            success = [t.executionTime for t in task_list \
+                if t.taskState == 'FINISHED'][-1].replace(microsecond=0)
         except IndexError:
             success = None
         host_result = (agent.hostname, success)
@@ -104,6 +109,7 @@ def handle_cdp5_server(server):
     for policy in client.Policy2.service.getPolicies():
         if not policy.enabled:
             continue
+        stuck_task = False
         try:
             if last_successful is None:
                 last_successful = policy.lastReplicationRunTime.replace(microsecond=0)
@@ -120,10 +126,18 @@ def handle_cdp5_server(server):
             if task.taskType == 'DATA_PROTECTION_POLICY' and 'executionTime' in task]
         task_list.sort(key=lambda t: t.executionTime)
         try:
-            success = [t.executionTime for t in task_list if t.taskState == 'FINISHED'][-1].replace(microsecond=0)
+            success = [t.executionTime for t in task_list \
+                if t.taskState == 'FINISHED'][-1].replace(microsecond=0)
+            try:
+                delta = datetime.datetime.now() - [t.executionTime for t in task_list \
+                        if t.taskState == 'RUNNING'][-1].replace(microsecond=0)
+                if (abs(delta.days * DAY_IN_SECONDS) + delta.seconds) > DAY_IN_SECONDS:
+                    stuck_task = True
+            except IndexError:
+                pass
         except IndexError:
             success = None
-        host_result = (agent.hostname, success)
+        host_result = (('**' + agent.hostname + '**') if stuck_task else agent.hostname, success)
         host_results.append(host_result)
     return (last_successful, host_results)
 
