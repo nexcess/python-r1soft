@@ -113,7 +113,8 @@ def handle_cdp5_server(server):
     client = r1soft.cdp3.CDP3Client(server['hostname'], server['username'],
         server['password'], server['port'], server['ssl'])
     exec_time_key = lambda task: task.executionTime
-    for policy in (p for p in client.Policy2.service.getPolicies() if p.enabled):
+    for policy in (p for p in client.Policy2.service.getPolicies() \
+            if p.enabled and 'diskSafeID' in p):
         stuck = False
         disk_safe = client.DiskSafe.service.getDiskSafeByID(policy.diskSafeID)
         agent = client.Agent.service.getAgentByID(disk_safe.agentID)
