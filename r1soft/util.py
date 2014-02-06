@@ -19,6 +19,8 @@
 
 import optparse
 import os
+import time
+
 try:
     import multiprocessing
 except ImportError:
@@ -81,3 +83,14 @@ def build_cdp2_client(server):
 def build_cdp3_client(server):
     return CDP3Client(server['hostname'], server['username'],
         server['password'], server['port'], server['ssl'])
+
+def rate_limit(limit, iterator):
+    hz = 1.0 / (limit * 1.0)
+    prev = time.time()
+    for item in iterator:
+        now = time.time()
+        delta = max(0, now - prev)
+        if delta < hz:
+            time.sleep(hz - delta)
+        prev = time.time()
+        yield item

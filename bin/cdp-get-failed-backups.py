@@ -20,6 +20,7 @@
 
 import logging
 import datetime
+import time
 
 import r1soft
 
@@ -28,6 +29,12 @@ logger = logging.getLogger('cdp-get-failed-backups')
 DAY_IN_SECONDS      = 60 * 60 * 24
 CDP3_STUCK_DELTA    = DAY_IN_SECONDS
 CDP5_STUCK_DELTA    = DAY_IN_SECONDS
+
+def _get_server_time(client):
+    # we should check with the server to find out what time it thinks it is
+    # and use that for correct time deltas but there doesn't seem to be an
+    # API method to get it so we'll just fake it with this for now
+    return datetime.datetime.now()
 
 def read_config(config_filename):
     with open(config_filename) as f:
@@ -105,40 +112,42 @@ def handle_cdp5_server(server):
     host_results = []
     client = r1soft.cdp3.CDP3Client(server['hostname'], server['username'],
         server['password'], server['port'], server['ssl'])
+    exec_time_key = lambda task: task.executionTime
+    for policy in (p for p in client.Policy2.service.getPolicies() if p.enabled):
+        stuck = False
+        disk_safe = client.DiskSafe.service.getDiskSafeByID(policy.diskSafeID)
+        agent = client.Agent.service.getAgentByID(disk_safe.agentID)
+        task_list = sorted(
+            (task for task in \
+                (client.TaskHistory.service.getTaskExecutionContextByID(task_id) \
+                    for task_id in client.TaskHistory.service.getTaskExecutionContextIDsByAgent(disk_safe.agentID)) \
+                if task.taskType == 'DATA_PROTECTION_POLICY' and \
+                    'executionTime' in task),
+            key=exec_time_key)
 
-    for policy in client.Policy2.service.getPolicies():
-        if not policy.enabled:
-            continue
-        stuck_task = False
-        try:
-            if last_successful is None:
+        if policy.state == 'ERROR':
+            # policy's last run had an error
+            finished_tasks = sorted(filter(lambda task: task.taskState == 'FINISHED', task_list), key=exec_time_key)
+            if finished_tasks:
+                latest_error_time = finished_tasks[-1].executionTime.replace(microsecond=0)
+                host_results.append((agent.hostname, latest_error_time))
+            else:
+                host_results.append((agent.hostname, '> 30 days'))
+
+        elif policy.state != 'UNKNOWN':
+            # policy's last run was successful (possibly with alerts)
+            running_tasks = sorted(filter(lambda task: task.taskState == 'RUNNING', task_list), key=exec_time_key)
+            if running_tasks:
+                run_time = _get_server_time(client) - running_tasks[-1].executionTime.replace(microsecond=0)
+                if (abs(run_time.days * DAY_IN_SECONDS) + run_time.seconds) > CDP5_STUCK_DELTA:
+                    stuck = True
+                    host_results.append((agent.hostname, '**STUCK**'))
+            if not stuck and (last_successful is None or \
+                    last_successful < policy.lastReplicationRunTime):
                 last_successful = policy.lastReplicationRunTime.replace(microsecond=0)
-            elif last_successful < policy.lastReplicationRunTime:
-                last_successful = policy.lastReplicationRunTime.replace(microsecond=0)
-        except AttributeError:
-            continue
-        if policy.state not in ('ERROR', 'UNKNOWN'):
-            continue
-        disksafe = client.DiskSafe.service.getDiskSafeByID(policy.diskSafeID)
-        agent = client.Agent.service.getAgentByID(disksafe.agentID)
-        task_list = [task for task in (client.TaskHistory.service.getTaskExecutionContextByID(tid) \
-                for tid in client.TaskHistory.service.getTaskExecutionContextIDsByAgent(disksafe.agentID)) \
-            if task.taskType == 'DATA_PROTECTION_POLICY' and 'executionTime' in task]
-        task_list.sort(key=lambda t: t.executionTime)
-        try:
-            success = [t.executionTime for t in task_list \
-                if t.taskState == 'FINISHED'][-1].replace(microsecond=0)
-            try:
-                delta = datetime.datetime.now() - [t.executionTime for t in task_list \
-                        if t.taskState == 'RUNNING'][-1].replace(microsecond=0)
-                if (abs(delta.days * DAY_IN_SECONDS) + delta.seconds) > DAY_IN_SECONDS:
-                    stuck_task = True
-            except IndexError:
-                pass
-        except IndexError:
-            success = None
-        host_result = (('**' + agent.hostname + '**') if stuck_task else agent.hostname, success)
-        host_results.append(host_result)
+        else:
+            # policy hasn't been run before ever
+            pass
     return (last_successful, host_results)
 
 def handle_server(server):

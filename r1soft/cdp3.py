@@ -19,6 +19,8 @@
 
 import logging
 import suds
+import functools
+import time
 
 logger = logging.getLogger('r1soft.cdp3')
 
@@ -38,6 +40,33 @@ def build_wsdl_url(host, namespace, port=None, ssl=True):
     )
     logger.debug('Built WSDL url: %s', url)
     return url
+
+class SoapClientProxy(object):
+    def __init__(self, real_client, rate_limit=8.0, backwards_compat=True):
+        self._real_client = real_client
+        self._rl_hz = 1.0 / (rate_limit * 1.0)
+        self._rl_prev = time.time()
+        if backwards_compat:
+            # self.service = self._real_client.service
+            # self.factory = self._real_client.factory
+            self.service = self
+            self.factory = self
+
+    def __getattr__(self, name):
+        func = getattr(self._real_client.service, name)
+        # @functools.wraps(func)
+        def rate_limit_wrapper(*args, **kwargs):
+            now = time.time()
+            delta = max(0, now - self._rl_prev)
+            if delta < self._rl_hz:
+                time.sleep(self._rl_hz - delta)
+            self._rl_prev = time.time()
+            return func(*args, **kwargs)
+        return rate_limit_wrapper
+
+    def __call__(self, *args, **kwargs):
+        return self._real_client.factory.create(*args, **kwargs)
+    create = __call__
 
 class CDP3Client(object):
     """SOAP client for CDP3+ API
@@ -61,11 +90,11 @@ class CDP3Client(object):
         if ns is None:
             logger.debug('Client doesn\'t exist, creating client for ' \
                 'namespace: %s', name)
-            ns = suds.client.Client(
+            ns = SoapClientProxy(suds.client.Client(
                 build_wsdl_url(self._host, name, self._port, self._ssl),
                 username=self._username,
                 password=self._password,
-                **self._init_args)
+                **self._init_args))
             self.__namespaces[name] = ns
         return ns
 
