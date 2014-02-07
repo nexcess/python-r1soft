@@ -19,8 +19,8 @@
 
 import logging
 import suds
-import functools
 import time
+import urllib2
 
 logger = logging.getLogger('r1soft.cdp3')
 
@@ -41,20 +41,36 @@ def build_wsdl_url(host, namespace, port=None, ssl=True):
     logger.debug('Built WSDL url: %s', url)
     return url
 
-class SoapClientProxy(object):
-    def __init__(self, real_client, rate_limit=8.0, backwards_compat=True):
+class SoapClientWrapper(object):
+    def __init__(self, real_client, **kwargs):
+        self._options = kwargs
         self._real_client = real_client
-        self._rl_hz = 1.0 / (rate_limit * 1.0)
-        self._rl_prev = time.time()
-        if backwards_compat:
-            # self.service = self._real_client.service
-            # self.factory = self._real_client.factory
-            self.service = self
-            self.factory = self
+        self._post_init()
 
     def __getattr__(self, name):
-        func = getattr(self._real_client.service, name)
-        # @functools.wraps(func)
+        return getattr(self._real_client.service, name)
+
+    def __call__(self, *args, **kwargs):
+        return self._real_client.factory.create(*args, **kwargs)
+
+    def _post_init(self):
+        if self._options.get('backwards_compat', True):
+            self.service = self
+            self.factory = self
+            self.create = self.__call__
+
+class SoapRateLimiter(SoapClientWrapper):
+    def _post_init(self):
+        super(SoapRateLimiter, self)._post_init()
+        rate_limit = self._options.get('rate_limit', None)
+        if rate_limit is None:
+            self._rl_hz = 0
+        else:
+            self._rl_hz = 1.0 / (rate_limit * 1.0)
+        self._rl_prev = time.time()
+
+    def __getattr__(self, name):
+        func = super(SoapRateLimiter, self).__getattr__(name)
         def rate_limit_wrapper(*args, **kwargs):
             now = time.time()
             delta = max(0, now - self._rl_prev)
@@ -64,9 +80,22 @@ class SoapClientProxy(object):
             return func(*args, **kwargs)
         return rate_limit_wrapper
 
-    def __call__(self, *args, **kwargs):
-        return self._real_client.factory.create(*args, **kwargs)
-    create = __call__
+class SoapRetrier(SoapRateLimiter):
+    def __getattr__(self, name):
+        func = super(SoapRetrier, self).__getattr__(name)
+        def retrier_wrapper(*args, **kwargs):
+            final_error = None
+            for i in xrange(self._options.get('retries', 1)):
+                try:
+                    result = func(*args, **kwargs)
+                except urllib2.URLError as err:
+                    final_error = err
+                    continue
+                else:
+                    return result
+            else:
+                raise final_error
+        return retrier_wrapper
 
 class CDP3Client(object):
     """SOAP client for CDP3+ API
@@ -90,11 +119,16 @@ class CDP3Client(object):
         if ns is None:
             logger.debug('Client doesn\'t exist, creating client for ' \
                 'namespace: %s', name)
-            ns = SoapClientProxy(suds.client.Client(
-                build_wsdl_url(self._host, name, self._port, self._ssl),
-                username=self._username,
-                password=self._password,
-                **self._init_args))
+            ns = SoapRetrier(
+                suds.client.Client(
+                    build_wsdl_url(self._host, name, self._port, self._ssl),
+                    username=self._username,
+                    password=self._password,
+                    **self._init_args),
+                rate_limit=None,
+                retries=3,
+                backwards_compat=True
+                )
             self.__namespaces[name] = ns
         return ns
 

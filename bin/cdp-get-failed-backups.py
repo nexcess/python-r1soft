@@ -125,7 +125,6 @@ def handle_cdp5_server(server):
                 if task.taskType == 'DATA_PROTECTION_POLICY' and \
                     'executionTime' in task),
             key=exec_time_key)
-
         if policy.state == 'ERROR':
             # policy's last run had an error
             finished_tasks = sorted(filter(lambda task: task.taskState == 'FINISHED', task_list), key=exec_time_key)
@@ -142,7 +141,8 @@ def handle_cdp5_server(server):
                 run_time = _get_server_time(client) - running_tasks[-1].executionTime.replace(microsecond=0)
                 if (abs(run_time.days * DAY_IN_SECONDS) + run_time.seconds) > CDP5_STUCK_DELTA:
                     stuck = True
-                    host_results.append((agent.hostname, '**STUCK**'))
+                    host_results.append((agent.hostname, '**STUCK** since %s' % \
+                        running_tasks[-1].executionTime.replace(microsecond=0)))
             if not stuck and (last_successful is None or \
                     last_successful < policy.lastReplicationRunTime):
                 last_successful = policy.lastReplicationRunTime.replace(microsecond=0)
@@ -158,7 +158,11 @@ def handle_server(server):
         4:  handle_cdp3_server,
         5:  handle_cdp5_server,
     }.get(server['version'])
-    return handle_func(server)
+    try:
+        results = (server, False, handle_func(server))
+    except Exception as err:
+        results = (server, True, err)
+    return results
 
 if __name__ == '__main__':
     import sys
@@ -169,13 +173,11 @@ if __name__ == '__main__':
         logger.error('Config file must be the first CLI argument')
         sys.exit(1)
 
-    for server in config:
-        try:
-            last_successful, results = handle_server(server)
-        except Exception as err:
+    for (server, has_err, result) in r1soft.util.dispatch_handlers_t(config, handle_server):
+        if has_err:
             print '^ %s (CDP%d) ^ ERROR! ^' % (server['hostname'], server['version'])
-            print '| %s | %s |' % (err.__class__.__name__, err)
+            print '| %s | %s |' % (result.__class__.__name__, result)
         else:
-            print '^ %s (CDP%d) ^ %s ^' % (server['hostname'], server['version'], last_successful)
-            for result in results:
-                print '| %s | %s |' % result
+            print '^ %s (CDP%d) ^ %s ^' % (server['hostname'], server['version'], result[0])
+            for host in result[1]:
+                print '| %s | %s |' % host

@@ -23,6 +23,7 @@ import time
 
 try:
     import multiprocessing
+    import multiprocessing.pool
 except ImportError:
     multiprocessing = None
 
@@ -62,19 +63,23 @@ def build_link(server):
         proto='https' if server['ssl'] else 'http'
     )
 
-def dispatch_handlers(config, handle_map, default=None):
-    if default is None:
-        def default(server):
-            raise Exception('CDP version %d is unsupported' % server['version'])
-
+def dispatch_handlers(config, server_handler):
     for server in config:
-        yield (server, lambda: handle_map.get(server['version'], default)(server))
+        yield (server, server_handler(server))
 
-def dispatch_handlers_mp(config, handle_map, default=None, workers=4):
+def dispatch_handlers_mp(config, server_handler, workers=4):
     if multiprocessing is None:
-        return dispatch_handlers(config, handle_map, default)
+        return dispatch_handlers(config, server_handler)
     else:
-        pass
+        pool = multiprocessing.Pool(workers)
+        return pool.map(server_handler, config, 1)
+
+def dispatch_handlers_t(config, server_handler, workers=4):
+    if multiprocessing is None:
+        return dispatch_handlers(config, server_handler)
+    else:
+        pool = multiprocessing.pool.ThreadPool(workers)
+        return pool.map(server_handler, config, 1)
 
 def build_cdp2_client(server):
     return CDP2Client(server['hostname'], server['username'],
