@@ -67,19 +67,19 @@ def dispatch_handlers(config, server_handler):
     for server in config:
         yield (server, server_handler(server))
 
-def dispatch_handlers_mp(config, server_handler, workers=4):
+def dispatch_handlers_mp(config, server_handler, workers=None):
     if multiprocessing is None:
         return dispatch_handlers(config, server_handler)
     else:
         pool = multiprocessing.Pool(workers)
-        return pool.map(server_handler, config, 1)
+        return pool.map(server_handler, config)
 
-def dispatch_handlers_t(config, server_handler, workers=4):
+def dispatch_handlers_t(config, server_handler, workers=None):
     if multiprocessing is None:
         return dispatch_handlers(config, server_handler)
     else:
         pool = multiprocessing.pool.ThreadPool(workers)
-        return pool.map(server_handler, config, 1)
+        return pool.map(server_handler, config)
 
 def build_cdp2_client(server):
     return CDP2Client(server['hostname'], server['username'],
