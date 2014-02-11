@@ -122,8 +122,8 @@ if __name__ == '__main__':
     }
 
     dummy_func = lambda server: (server, lambda: None)
-    for (server, handler) in r1soft.util.dispatch_handlers(config, handler_map,
-            dummy_func):
+    for (server, handler) in r1soft.util.dispatch_handlers(config,
+            lambda s: handler_map.get(s['version'])(s)):
         try:
             handler()
         except Exception as err:

@@ -54,8 +54,8 @@ if __name__ == '__main__':
         5: lambda server: handle_cdp3_server(server, username, new_password),
     }
 
-    for (server, results) in r1soft.util.dispatch_handlers(config, handler_map,
-            lambda server: None):
+    for (server, results) in r1soft.util.dispatch_handlers(config,
+            lambda s: handler_map.get(s['version'])(s)):
         try:
             results()
         except Exception as err:

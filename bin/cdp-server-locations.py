@@ -91,7 +91,8 @@ if __name__ == '__main__':
     agent_lines = []
 
     print HOST_LIST_HEADER
-    for server, get_results in r1soft.util.dispatch_handlers(config, handler_map):
+    for server, get_results in r1soft.util.dispatch_handlers(config,
+            lambda s: handler_map.get(s['version'])(s)):
         try:
             results = get_results()
         except Exception as err:
