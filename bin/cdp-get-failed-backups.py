@@ -118,7 +118,6 @@ def handle_cdp5_server(server):
         stuck = False
         disk_safe = client.DiskSafe.service.getDiskSafeByID(policy.diskSafeID)
         agent = client.Agent.service.getAgentByID(disk_safe.agentID)
-        print 'starting: %s' % agent.hostname
         task_list = sorted(
             (task for task in \
                 (client.TaskHistory.service.getTaskExecutionContextByID(task_id) \
@@ -149,7 +148,6 @@ def handle_cdp5_server(server):
         else: # policy.state == 'UNKNOWN'
             # policy hasn't been run before ever
             pass
-        print 'finished: %s' % agent.hostname
     return (last_successful, host_results)
 
 def handle_server(server):
