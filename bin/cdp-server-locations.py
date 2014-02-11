@@ -72,6 +72,7 @@ handler_map = {
     5: handle_cdp3_server,
 }
 
+
 if __name__ == '__main__':
     import sys
 
@@ -90,12 +91,17 @@ if __name__ == '__main__':
     server_results = {}
     agent_lines = []
 
-    print HOST_LIST_HEADER
-    for server, get_results in r1soft.util.dispatch_handlers(config,
-            lambda s: handler_map.get(s['version'])(s)):
+    def handle_server(server):
+        handle_func = handler_map.get(server['version'])
         try:
-            results = get_results()
+            results = handle_func(server)
         except Exception as err:
+            results = False
+        return (server, results)
+
+    print HOST_LIST_HEADER
+    for server, results in r1soft.util.dispatch_handlers_t(config, handle_server):
+        if results is False:
             server_results[server['hostname']] = False
             continue
         server_results[server['hostname']] = True
