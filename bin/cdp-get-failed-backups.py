@@ -118,6 +118,7 @@ def handle_cdp5_server(server):
         stuck = False
         disk_safe = client.DiskSafe.service.getDiskSafeByID(policy.diskSafeID)
         agent = client.Agent.service.getAgentByID(disk_safe.agentID)
+        print 'starting: %s' % agent.hostname
         task_list = sorted(
             (task for task in \
                 (client.TaskHistory.service.getTaskExecutionContextByID(task_id) \
@@ -125,16 +126,7 @@ def handle_cdp5_server(server):
                 if task.taskType == 'DATA_PROTECTION_POLICY' and \
                     'executionTime' in task),
             key=exec_time_key)
-        if policy.state == 'ERROR':
-            # policy's last run had an error
-            finished_tasks = sorted(filter(lambda task: task.taskState == 'FINISHED', task_list), key=exec_time_key)
-            if finished_tasks:
-                latest_error_time = finished_tasks[-1].executionTime.replace(microsecond=0)
-                host_results.append((agent.hostname, latest_error_time))
-            else:
-                host_results.append((agent.hostname, '> 30 days'))
-
-        elif policy.state != 'UNKNOWN':
+        if policy.state in ('OK', 'ALERT'):
             # policy's last run was successful (possibly with alerts)
             running_tasks = sorted(filter(lambda task: task.taskState == 'RUNNING', task_list), key=exec_time_key)
             if running_tasks:
@@ -146,9 +138,18 @@ def handle_cdp5_server(server):
             if not stuck and (last_successful is None or \
                     last_successful < policy.lastReplicationRunTime):
                 last_successful = policy.lastReplicationRunTime.replace(microsecond=0)
-        else:
+        elif policy.state == 'ERROR':
+            # policy's last run had an error
+            finished_tasks = sorted(filter(lambda task: task.taskState == 'FINISHED', task_list), key=exec_time_key)
+            if finished_tasks:
+                latest_error_time = finished_tasks[-1].executionTime.replace(microsecond=0)
+                host_results.append((agent.hostname, latest_error_time))
+            else:
+                host_results.append((agent.hostname, '> 30 days'))
+        else: # policy.state == 'UNKNOWN'
             # policy hasn't been run before ever
             pass
+        print 'finished: %s' % agent.hostname
     return (last_successful, host_results)
 
 def handle_server(server):
