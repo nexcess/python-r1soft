@@ -154,7 +154,7 @@ def handle_cdp5_server(server):
             pass
         return (last_successful, result)
 
-    pool = multiprocessing.pool.ThreadPool(None)
+    pool = multiprocessing.pool.ThreadPool(4)
     results = pool.map(_handle_policy,
         (p for p in main_client.Policy2.service.getPolicies() \
             if p.enabled and 'diskSafeID' in p))
@@ -184,7 +184,7 @@ if __name__ == '__main__':
         logger.error('Config file must be the first CLI argument')
         sys.exit(1)
 
-    for (server, has_err, result) in r1soft.util.dispatch_handlers_t(config, handle_server):
+    for (server, has_err, result) in r1soft.util.dispatch_handlers_t(config, handle_server, 4):
         if has_err:
             print '^ %s (CDP%d) ^ ERROR! ^' % (server['hostname'], server['version'])
             print '| %s | %s |' % (result.__class__.__name__, result)
