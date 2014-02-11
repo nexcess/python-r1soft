@@ -21,6 +21,7 @@
 import logging
 import datetime
 import time
+import multiprocessing.pool
 
 import r1soft
 
@@ -108,20 +109,23 @@ def handle_cdp3_server(server):
     return (last_successful, host_results)
 
 def handle_cdp5_server(server):
-    last_successful = None
-    host_results = []
-    client = r1soft.cdp3.CDP3Client(server['hostname'], server['username'],
+    main_client = r1soft.cdp3.CDP3Client(server['hostname'], server['username'],
         server['password'], server['port'], server['ssl'])
     exec_time_key = lambda task: task.executionTime
-    for policy in (p for p in client.Policy2.service.getPolicies() \
-            if p.enabled and 'diskSafeID' in p):
+
+    def _handle_policy(policy):
+        t_client = r1soft.cdp3.CDP3Client(server['hostname'], server['username'],
+            server['password'], server['port'], server['ssl'])
+
+        last_successful = None
+        result = None
         stuck = False
-        disk_safe = client.DiskSafe.service.getDiskSafeByID(policy.diskSafeID)
-        agent = client.Agent.service.getAgentByID(disk_safe.agentID)
+        disk_safe = t_client.DiskSafe.service.getDiskSafeByID(policy.diskSafeID)
+        agent = t_client.Agent.service.getAgentByID(disk_safe.agentID)
         task_list = sorted(
             (task for task in \
-                (client.TaskHistory.service.getTaskExecutionContextByID(task_id) \
-                    for task_id in client.TaskHistory.service.getTaskExecutionContextIDsByAgent(disk_safe.agentID)) \
+                (t_client.TaskHistory.service.getTaskExecutionContextByID(task_id) \
+                    for task_id in t_client.TaskHistory.service.getTaskExecutionContextIDsByAgent(disk_safe.agentID)) \
                 if task.taskType == 'DATA_PROTECTION_POLICY' and \
                     'executionTime' in task),
             key=exec_time_key)
@@ -129,11 +133,11 @@ def handle_cdp5_server(server):
             # policy's last run was successful (possibly with alerts)
             running_tasks = sorted(filter(lambda task: task.taskState == 'RUNNING', task_list), key=exec_time_key)
             if running_tasks:
-                run_time = _get_server_time(client) - running_tasks[-1].executionTime.replace(microsecond=0)
+                run_time = _get_server_time(t_client) - running_tasks[-1].executionTime.replace(microsecond=0)
                 if (abs(run_time.days * DAY_IN_SECONDS) + run_time.seconds) > CDP5_STUCK_DELTA:
                     stuck = True
-                    host_results.append((agent.hostname, '**STUCK** since %s' % \
-                        running_tasks[-1].executionTime.replace(microsecond=0)))
+                    result = (agent.hostname, '**STUCK** since %s' % \
+                        running_tasks[-1].executionTime.replace(microsecond=0))
             if not stuck and (last_successful is None or \
                     last_successful < policy.lastReplicationRunTime):
                 last_successful = policy.lastReplicationRunTime.replace(microsecond=0)
@@ -142,12 +146,20 @@ def handle_cdp5_server(server):
             finished_tasks = sorted(filter(lambda task: task.taskState == 'FINISHED', task_list), key=exec_time_key)
             if finished_tasks:
                 latest_error_time = finished_tasks[-1].executionTime.replace(microsecond=0)
-                host_results.append((agent.hostname, latest_error_time))
+                result = (agent.hostname, latest_error_time)
             else:
-                host_results.append((agent.hostname, '> 30 days'))
+                result = (agent.hostname, '> 30 days')
         else: # policy.state == 'UNKNOWN'
             # policy hasn't been run before ever
             pass
+        return (last_successful, result)
+
+    pool = multiprocessing.pool.ThreadPool(None)
+    results = pool.map(_handle_policy,
+        (p for p in main_client.Policy2.service.getPolicies() \
+            if p.enabled and 'diskSafeID' in p))
+    last_successful = max(r[0] for r in results if r[0] is not None)
+    host_results = [r[1] for r in results if r[1] is not None]
     return (last_successful, host_results)
 
 def handle_server(server):
