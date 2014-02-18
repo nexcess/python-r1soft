@@ -28,6 +28,7 @@ logger.setLevel(logging.INFO)
 logger.propagate = False
 
 def handle_cdp3_server(server, username, new_password):
+    updated = False
     client = r1soft.util.build_cdp3_client(server)
     logger.info('Checking users on server: %s', server['hostname'])
     users = client.User.service.getUsers()
@@ -36,6 +37,12 @@ def handle_cdp3_server(server, username, new_password):
         logger.info('Updating user: %s (%s)', user.username, user.id)
         user.password = new_password
         client.User.service.updateUser(user)
+        updated = True
+    return updated
+
+def handle_cdp2_server(server, username, new_password):
+    updated = False
+    return updated
 
 if __name__ == '__main__':
     import sys
@@ -50,13 +57,11 @@ if __name__ == '__main__':
     config = r1soft.util.read_config(config_file)
 
     handler_map = {
+        2: lambda server: handle_cdp2_server(server, username, new_password),
         3: lambda server: handle_cdp3_server(server, username, new_password),
         5: lambda server: handle_cdp3_server(server, username, new_password),
     }
 
     for (server, results) in r1soft.util.dispatch_handlers(config,
             lambda s: handler_map.get(s['version'])(s)):
-        try:
-            results()
-        except Exception as err:
-            logger.exception(err)
+        print '%s: %s' % (server['hostname'], results)
