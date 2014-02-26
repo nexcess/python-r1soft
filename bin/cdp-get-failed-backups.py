@@ -158,7 +158,10 @@ def handle_cdp5_server(server):
     results = pool.map(_handle_policy,
         (p for p in main_client.Policy2.service.getPolicies() \
             if p.enabled and 'diskSafeID' in p))
-    last_successful = max(r[0] for r in results if r[0] is not None)
+    try:
+        last_successful = max(r[0] for r in results if r[0] is not None)
+    except ValueError:
+        last_successful = None
     host_results = [r[1] for r in results if r[1] is not None]
     return (last_successful, host_results)
 
