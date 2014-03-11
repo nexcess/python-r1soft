@@ -129,7 +129,9 @@ def handle_cdp5_server(server):
                 if task.taskType == 'DATA_PROTECTION_POLICY' and \
                     'executionTime' in task),
             key=exec_time_key)
-        if policy.state in ('OK', 'ALERT'):
+        if not policy.enabled:
+            result = (agent.hostname, '** DISABLED **')
+        elif policy.state in ('OK', 'ALERT'):
             # policy's last run was successful (possibly with alerts)
             running_tasks = sorted(filter(lambda task: task.taskState == 'RUNNING', task_list), key=exec_time_key)
             if running_tasks:
@@ -157,7 +159,7 @@ def handle_cdp5_server(server):
     pool = multiprocessing.pool.ThreadPool(4)
     results = pool.map(_handle_policy,
         (p for p in main_client.Policy2.service.getPolicies() \
-            if p.enabled and 'diskSafeID' in p))
+            if 'diskSafeID' in p))
     try:
         last_successful = max(r[0] for r in results if r[0] is not None)
     except ValueError:
