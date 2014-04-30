@@ -104,7 +104,7 @@ def handle_cdp3_server(server):
                 if t.taskState == 'FINISHED'][-1].replace(microsecond=0)
         except IndexError:
             success = None
-        host_result = (agent.hostname, success)
+        host_result = (agent.hostname, agent.description, success)
         host_results.append(host_result)
     return (last_successful, host_results)
 
@@ -130,7 +130,7 @@ def handle_cdp5_server(server):
                     'executionTime' in task),
             key=exec_time_key)
         if not policy.enabled:
-            result = (agent.hostname, '** DISABLED **')
+            result = (agent.hostname, agent.description, '** DISABLED **')
         elif policy.state in ('OK', 'ALERT'):
             # policy's last run was successful (possibly with alerts)
             running_tasks = sorted(filter(lambda task: task.taskState == 'RUNNING', task_list), key=exec_time_key)
@@ -138,7 +138,7 @@ def handle_cdp5_server(server):
                 run_time = _get_server_time(t_client) - running_tasks[-1].executionTime.replace(microsecond=0)
                 if (abs(run_time.days * DAY_IN_SECONDS) + run_time.seconds) > CDP5_STUCK_DELTA:
                     stuck = True
-                    result = (agent.hostname, '**STUCK** since %s' % \
+                    result = (agent.hostname, agent.description, '**STUCK** since %s' % \
                         running_tasks[-1].executionTime.replace(microsecond=0))
             if not stuck and (last_successful is None or \
                     last_successful < policy.lastReplicationRunTime):
@@ -148,9 +148,9 @@ def handle_cdp5_server(server):
             finished_tasks = sorted(filter(lambda task: task.taskState == 'FINISHED', task_list), key=exec_time_key)
             if finished_tasks:
                 latest_error_time = finished_tasks[-1].executionTime.replace(microsecond=0)
-                result = (agent.hostname, latest_error_time)
+                result = (agent.hostname, agent.description, latest_error_time)
             else:
-                result = (agent.hostname, '> 30 days')
+                result = (agent.hostname, agent.description, '> 30 days')
         else: # policy.state == 'UNKNOWN'
             # policy hasn't been run before ever
             pass
@@ -191,9 +191,9 @@ if __name__ == '__main__':
 
     for (server, has_err, result) in r1soft.util.dispatch_handlers_t(config, handle_server, 4):
         if has_err:
-            print '^ %s (CDP%d) ^ ERROR! ^' % (server['hostname'], server['version'])
-            print '| %s | %s |' % (result.__class__.__name__, result)
+            print '^ %s ^ CDP%d ^ ERROR! ^' % (server['hostname'], server['version'])
+            print '| N/A | %s | %s |' % (result.__class__.__name__, result)
         else:
-            print '^ %s (CDP%d) ^ %s ^' % (server['hostname'], server['version'], result[0])
+            print '^ %s ^ CDP%d ^ %s ^' % (server['hostname'], server['version'], result[0])
             for host in result[1]:
-                print '| %s | %s |' % host
+                print '| %s | %s | %s |' % host

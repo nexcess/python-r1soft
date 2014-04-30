@@ -76,8 +76,8 @@ handler_map = {
 if __name__ == '__main__':
     import sys
 
-    HOST_LIST_HEADER = '^ Hostname (Description) ^ Backup Server ^ Host Type ^ Enabled ^ MySQL Module ^'
-    HOST_LIST_LINE = '| {hostname} ({description}) | [[{server_link}|{server_hostname}]] | {type} | {active} | {mysql_module} |'
+    HOST_LIST_HEADER = '^ Hostname ^ Description ^ Backup Server ^ Host Type ^ Enabled ^ MySQL Module ^'
+    HOST_LIST_LINE = '| {hostname} | {description} | [[{server_link}|{server_hostname}]] | {type} | {active} | {mysql_module} |'
 
     SERVER_LIST_HEADER = '^ Backup Server ^ Polling Status ^'
     SERVER_LIST_LINE = '| {server_hostname} | {status} |'
