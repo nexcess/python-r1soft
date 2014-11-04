@@ -21,6 +21,7 @@ import logging
 import suds
 import time
 import urllib2
+import ssl
 
 logger = logging.getLogger('r1soft.cdp3')
 
@@ -40,6 +41,13 @@ def build_wsdl_url(host, namespace, port=None, ssl=True):
     )
     logger.debug('Built WSDL url: %s', url)
     return url
+
+class PoodleSSLSocket(ssl.SSLSocket):
+    def __init__(self, *pargs, **kwargs):
+        kwargs['ssl_version'] = ssl.PROTOCOL_TLSv1
+        super(PoodleSSLSocket, self).__init__(*pargs, **kwargs)
+
+ssl.SSLSocket = PoodleSSLSocket
 
 class SoapClientWrapper(object):
     def __init__(self, real_client, **kwargs):
