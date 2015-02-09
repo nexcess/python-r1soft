@@ -43,6 +43,9 @@ def build_wsdl_url(host, namespace, port=None, ssl=True):
     return url
 
 class PoodleSSLSocket(ssl.SSLSocket):
+    """Use TLSv1 by default for SSL connections thanks to SSLv3 being disabled
+    in the R1soft update
+    """
     def __init__(self, *pargs, **kwargs):
         kwargs['ssl_version'] = ssl.PROTOCOL_TLSv1
         super(PoodleSSLSocket, self).__init__(*pargs, **kwargs)
