@@ -196,4 +196,7 @@ if __name__ == '__main__':
         else:
             print '^ %s ^ CDP%d ^ %s ^' % (server['hostname'], server['version'], result[0])
             for host in result[1]:
-                print '| %s | %s | %s |' % host
+                try:
+                    print '| %s | %s | %s |' % host
+                except TypeError as e:
+                    print '| TypeError | %s | %s |' % (e, repr(host))
