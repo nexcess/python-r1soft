@@ -60,6 +60,7 @@ def handle_cdp3_server(server):
             'description': agent.description,
             'type': agent.osType.upper(),
             'active' :policy.enabled,
+            'recovery_point_limit': policy.recoveryPointLimit,
             'cp_module': False, # we'll just leave this out for now
             'mysql_module': bool(agent.databaseAddOnEnabled and \
                 (hasattr(policy, 'databaseInstanceList') and policy.databaseInstanceList)),
@@ -76,8 +77,8 @@ handler_map = {
 if __name__ == '__main__':
     import sys
 
-    HOST_LIST_HEADER = '^ Hostname ^ Description ^ Backup Server ^ Host Type ^ Enabled ^ MySQL Module ^'
-    HOST_LIST_LINE = '| {hostname} | {description} | [[{server_link}|{server_hostname}]] | {type} | {active} | {mysql_module} |'
+    HOST_LIST_HEADER = '^ Hostname ^ Description ^ Backup Server ^ Host Type ^ Enabled ^ Recovery Point Limit ^ MySQL Module ^'
+    HOST_LIST_LINE = '| {hostname} | {description} | [[{server_link}|{server_hostname}]] | {type} | {active} | {recovery_point_limit} | {mysql_module} |'
 
     SERVER_LIST_HEADER = '^ Backup Server ^ Polling Status ^'
     SERVER_LIST_LINE = '| {server_hostname} | {status} |'
