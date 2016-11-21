@@ -129,9 +129,6 @@ class CDP3Client(object):
         self._ssl = ssl
         self._verify_ssl = verify_ssl
         self._init_args = kwargs
-        if self._ssl and not self._verify_ssl:
-            self._init_args['transport'] = UNSAFE_HttpsNoVerifyTransport(
-                username=username, password=password)
 
     def __getattr__(self, name):
         logger.debug('Loading SOAP client for namespace: %s', name)
@@ -144,6 +141,8 @@ class CDP3Client(object):
                     build_wsdl_url(self._host, name, self._port, self._ssl),
                     username=self._username,
                     password=self._password,
+                    transport=UNSAFE_HttpsNoVerifyTransport(
+                        username=self._username, password=self._password) if (self._ssl and not self._verify_ssl) else None,
                     **self._init_args),
                 rate_limit=None,
                 retries=3,
