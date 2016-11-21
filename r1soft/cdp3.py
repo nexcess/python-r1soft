@@ -22,6 +22,7 @@ import suds
 import time
 import urllib2
 import ssl
+from .sslcontext import create_ssl_context, HTTPSTransport
 
 logger = logging.getLogger('r1soft.cdp3')
 
@@ -51,6 +52,8 @@ class PoodleSSLSocket(ssl.SSLSocket):
         super(PoodleSSLSocket, self).__init__(*pargs, **kwargs)
 
 ssl.SSLSocket = PoodleSSLSocket
+
+UNSAFE_HttpsNoVerifyTransport = lambda **kwargs: HTTPSTransport(context=create_ssl_context(verify=False), **kwargs)
 
 class SoapClientWrapper(object):
     def __init__(self, real_client, **kwargs):
@@ -115,14 +118,18 @@ class CDP3Client(object):
     PORT_HTTP   = 9080
     PORT_HTTPS  = 9443
 
-    def __init__(self, host, username, password, port=None, ssl=True, **kwargs):
+    def __init__(self, host, username, password, port=None, ssl=True, verify_ssl=False, **kwargs):
         self.__namespaces = {}
         self._host = host
         self._username = username
         self._password = password
         self._port = port
         self._ssl = ssl
+        self._verify_ssl = verify_ssl
         self._init_args = kwargs
+        if self._ssl and not self._verify_ssl:
+            self._init_args['transport'] = UNSAFE_HttpsNoVerifyTransport(
+                username=username, password=password)
 
     def __getattr__(self, name):
         logger.debug('Loading SOAP client for namespace: %s', name)
