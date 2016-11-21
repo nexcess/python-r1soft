@@ -119,6 +119,8 @@ class CDP3Client(object):
     PORT_HTTPS  = 9443
 
     def __init__(self, host, username, password, port=None, ssl=True, verify_ssl=False, **kwargs):
+        # in a perfect world, verify_ssl would default to True but we'll leave
+        # it at False for now to make life easier
         self.__namespaces = {}
         self._host = host
         self._username = username
