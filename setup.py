@@ -23,7 +23,7 @@ from glob import glob
 
 setup(
     name='r1soft',
-    version='0.1',
+    version='0.2',
     description='',
     author='Alex Headley',
     author_email='aheadley@nexcess.net',
