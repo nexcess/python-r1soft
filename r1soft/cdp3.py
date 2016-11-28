@@ -89,7 +89,9 @@ class SoapRateLimiter(SoapClientWrapper):
             now = time.time()
             delta = max(0, now - self._rl_prev)
             if delta < self._rl_hz:
-                time.sleep(self._rl_hz - delta)
+                sleep_time = self._rl_hz - delta
+                logger.debug('Sleeping for %0.8d seconds for rate limiting', sleep_time)
+                time.sleep(sleep_time)
             self._rl_prev = time.time()
             return func(*args, **kwargs)
         return rate_limit_wrapper
@@ -103,11 +105,14 @@ class SoapRetrier(SoapRateLimiter):
                 try:
                     result = func(*args, **kwargs)
                 except urllib2.URLError as err:
+                    logger.warn('Got error response')
+                    logger.exception(err)
                     final_error = err
                     continue
                 else:
                     return result
             else:
+                logger.error('No more retries')
                 raise final_error
         return retrier_wrapper
 
@@ -142,7 +147,8 @@ class CDP3Client(object):
                     username=self._username,
                     password=self._password,
                     transport=UNSAFE_HttpsNoVerifyTransport(
-                        username=self._username, password=self._password) if (self._ssl and not self._verify_ssl) else None,
+                            username=self._username, password=self._password) \
+                        if (self._ssl and not self._verify_ssl) else None,
                     **self._init_args),
                 rate_limit=None,
                 retries=3,
